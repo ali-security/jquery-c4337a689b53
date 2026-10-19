@@ -550,8 +550,9 @@ test("fractions (see #7730 and #7885)", function() {
 
 	result = div.offset();
 
-	equal( result.top, expected.top, "Check top" );
-	equal( result.left, expected.left, "Check left" );
+	// Modern browsers lay out in 1/64px steps (e.g. 999.984375), so allow sub-pixel slack
+	ok( Math.abs( result.top - expected.top ) < 0.05, "Check top" );
+	ok( Math.abs( result.left - expected.left ) < 0.05, "Check left" );
 
 	div.remove();
 });
