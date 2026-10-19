@@ -92,7 +92,7 @@ test("name", function() {
 test( "selectors with comma", function() {
 	expect( 4 );
 
-	var fixture = jQuery( "<div><h2><span/></h2><div><p><span/></p><p/></div></div>" );
+	var fixture = jQuery( "<div><h2><span></span></h2><div><p><span></span></p><p></p></div></div>" );
 
 	equal( fixture.find( "h2, div p" ).filter( "p" ).length, 2, "has to find two <p>" );
 	equal( fixture.find( "h2, div p" ).filter( "h2" ).length, 1, "has to find one <h2>" );
@@ -220,7 +220,7 @@ test("attributes", function() {
 	t( "input[type=text]", "#form input[type=text]", ["text1", "text2", "hidden2", "name"] );
 	t( "input[type=search]", "#form input[type=search]", ["search"] );
 
-	withScript = supportjQuery( "<div><span><script src=''/></span></div>" );
+	withScript = supportjQuery( "<div><span><script src=''></script></span></div>" );
 	ok( withScript.find( "#moretests script[src]" ).has( "script" ), "script[src] (jQuery #13777)" );
 
 	div = document.getElementById("foo");
@@ -257,7 +257,7 @@ test("attributes", function() {
 test("disconnected nodes", function() {
 	expect( 1 );
 
-	var $div = jQuery("<div/>");
+	var $div = jQuery("<div></div>");
 	equal( $div.is("div"), true, "Make sure .is('nodeName') works on disconnected nodes." );
 });
 
