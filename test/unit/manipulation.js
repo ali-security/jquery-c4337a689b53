@@ -2498,3 +2498,104 @@ asyncTest( "Self-closing tags can't smuggle event handlers out of raw text eleme
 		start();
 	}, 1000 );
 });
+
+test( "Manipulation methods don't parse <option> or <optgroup> inside a <select> wrapper (CVE-2020-11023)", function() {
+
+	var $div, $parent, nodes,
+		smuggled = "<img src='data/cve-2020-11023.png' onerror='jQuery.noop()'>",
+		optionPayload = "<option><style></option></select>" + smuggled + "</style>",
+		optgroupPayload = "<optgroup><style></optgroup></select>" + smuggled + "</style>",
+		divParse = function( html ) {
+			var div = document.createElement( "div" );
+			div.innerHTML = html;
+			return div.innerHTML;
+		};
+
+	// Support: IE<=9
+	// IE <=9 can't create <option> outside of a <select>, so the wrapper is still needed
+	if ( !divParse( "<option></option>" ) ) {
+		expect( 1 );
+		ok( true, "<option> needs a <select> wrapper in this browser" );
+		return;
+	}
+
+	expect( 17 );
+
+	// html() fallback: strings with <style> are appended instead
+	$div = jQuery( "<div></div>" ).html( optionPayload );
+	equal( $div.find( "img" ).length, 0, "html(): no element escapes an <option> through a <select> wrapper" );
+	equal( $div.find( "option style" ).text(), "</option></select>" + smuggled, "html(): payload is kept as <style> text" );
+
+	$div = jQuery( "<div></div>" ).html( optgroupPayload );
+	equal( $div.find( "img" ).length, 0, "html(): no element escapes an <optgroup> through a <select> wrapper" );
+
+	nodes = jQuery( optionPayload );
+	equal( nodes.length, 1, "jQuery(html): only the <option> element is created" );
+	equal( nodes[ 0 ].nodeName.toLowerCase(), "option", "jQuery(html): <option> element is created" );
+
+	nodes = jQuery.parseHTML( optgroupPayload );
+	equal( nodes.length, 1, "jQuery.parseHTML(): only the <optgroup> element is created" );
+	equal( nodes[ 0 ].nodeName.toLowerCase(), "optgroup", "jQuery.parseHTML(): <optgroup> element is created" );
+
+	jQuery.each( [ "append", "prepend", "before", "after", "replaceWith" ], function( i, method ) {
+		$parent = jQuery( "<div><span></span></div>" );
+		$parent.children()[ method ]( optionPayload );
+		equal( $parent.find( "img" ).length, 0, method + "(): no element escapes an <option> through a <select> wrapper" );
+	});
+
+	// The markup must be parsed in the same context a sanitizer checks it in;
+	// a <select> wrapper is closed early by some tags, changing the resulting nodes
+	jQuery.each( [
+		optionPayload,
+		optgroupPayload,
+		"<option>a</option><input>",
+		"<optgroup label='a'></optgroup><select><option>b</option></select>"
+	], function( i, html ) {
+		equal( jQuery( "<div></div>" ).append( html ).html(), divParse( html ),
+			"append(): " + html + " is parsed like in a <div>" );
+	});
+
+	equal( jQuery( "<option>a</option><input>" ).length, 2, "jQuery(html): <option> isn't wrapped in a <select>" );
+});
+
+asyncTest( "<option> and <optgroup> can't smuggle event handlers out of sanitized HTML (CVE-2020-11023)", 1, function() {
+
+	var fired = [],
+		fixture = jQuery( "#qunit-fixture" ),
+		div = document.createElement( "div" ),
+		payload = function( tag, label ) {
+			return "<" + tag + "><style></" + tag + "></select>" +
+				"<img src='data/cve-2020-11023.png' onerror='window.cve202011023 && window.cve202011023( \"" + label + "\" )'>" +
+				"</style>";
+		};
+
+	// Support: IE<=9
+	// IE <=9 can't create <option> outside of a <select>, so the wrapper is still needed
+	div.innerHTML = "<option></option>";
+	if ( !div.lastChild ) {
+		ok( true, "<option> needs a <select> wrapper in this browser" );
+		start();
+		return;
+	}
+
+	Globals.register( "cve202011023" );
+	window.cve202011023 = function( label ) {
+		fired.push( label );
+	};
+
+	jQuery( "<div></div>" ).appendTo( fixture ).html( payload( "option", "html()" ) );
+	jQuery( "<div></div>" ).appendTo( fixture ).html( payload( "optgroup", "html() optgroup" ) );
+	jQuery( "<div></div>" ).appendTo( fixture ).append( payload( "option", "append()" ) );
+	jQuery( "<div></div>" ).appendTo( fixture ).prepend( payload( "option", "prepend()" ) );
+	jQuery( "<div><span></span></div>" ).appendTo( fixture ).children().before( payload( "option", "before()" ) );
+	jQuery( "<div><span></span></div>" ).appendTo( fixture ).children().after( payload( "optgroup", "after()" ) );
+	jQuery( "<div><span></span></div>" ).appendTo( fixture ).children().replaceWith( payload( "option", "replaceWith()" ) );
+	jQuery( "<select></select>" ).appendTo( fixture ).append( payload( "option", "append() to <select>" ) );
+	jQuery( payload( "option", "jQuery(html)" ) ).appendTo( fixture );
+	jQuery.parseHTML( payload( "optgroup", "jQuery.parseHTML()" ) );
+
+	setTimeout(function() {
+		deepEqual( fired, [], "No event handler smuggled out of an <option> or <optgroup> ran" );
+		start();
+	}, 1000 );
+});
